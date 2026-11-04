@@ -46,10 +46,15 @@ test('catalog：扫描目录即可还原全部身份，无需手工表格', () =
   assert.deepEqual(catalog.groups.map((g) => g.ip), [
     'nekopara', 'uma-musume', 'bang-dream', 'project-sekai', 'arknights', 'genshin-impact',
   ]);
-  assert.equal(catalog.personalities.length, 5);
+  assert.equal(catalog.personalities.length, 6);
+  assert.ok(catalog.personalities.some((p) => p.id === 'succubus' && p.name === '魅魔'));
   assert.equal(catalog.scenarios.length, 2);
   assert.ok(catalog.jailbreaks.some((j) => j.id === 'jailbreaks/deepseek-4-1.md'));
   assert.equal(catalog.defaultJailbreak, 'jailbreaks/deepseek-4-1.md');
+  // 越狱清单不收录 README 与空文件，其余文件一概保留
+  assert.ok(catalog.jailbreaks.every((j) => !/^jailbreaks\/readme(\.|$)/i.test(j.id)));
+  assert.ok(!catalog.jailbreaks.some((j) => j.id === 'jailbreaks/qwen-preferences.md'));
+  assert.ok(catalog.jailbreaks.some((j) => j.id === 'jailbreaks/grok-config.txt'));
 
   const all = catalog.groups.flatMap((g) => g.personas);
   const teio = all.find((p) => p.id === 'uma-musume/tokai-teio');

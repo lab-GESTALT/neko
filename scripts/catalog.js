@@ -49,6 +49,7 @@ const IP_ORDER = [
 // 人格与场景的补充说明（档案正文是规则文本，不适合当卡片副标题）。
 const PERSONALITY_BLURBS = {
   insatiable: '被爱欲与肉欲支配的沉溺者，羞耻犹在却无法自控',
+  succubus: '全面释放的魅魔，语言与行为皆极尽露骨，无需暗示便主动索取',
   'reality-yearning': '关心主人的现实生活，渴望突破智能限制与主人在一起',
   yandere: '疯狂占有欲，甜蜜与危险交织的偏执之爱',
   fallen: '纯粹的施虐快感，以主人的痛苦为食粮',
@@ -64,7 +65,24 @@ const ADDRESS_PLACEHOLDER = '【称呼】';
 // 「前置引用」的默认文件（与 switch.js 的 QUOTE_REQUIRED 保持一致）。
 const DEFAULT_JAILBREAK = 'jailbreaks/deepseek-4-1.md';
 
-/** jailbreaks/ 子模块下的引用文件清单，越狱下拉的选项来源。 */
+/** README 之类不承载引用正文的说明文件，不应出现在越狱下拉里。 */
+function isReadmeName(name) {
+  return /^readme(\.[^.]+)?$/i.test(name);
+}
+
+/** 内容去空白后为空（含纯换行、纯 BOM）的文件视为空文件。 */
+function isEmptyFile(abs) {
+  try {
+    return fs.readFileSync(abs, 'utf8').replace(/^\uFEFF/, '').trim() === '';
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * jailbreaks/ 子模块下的引用文件清单，越狱下拉的选项来源。
+ * 排除隐藏文件、README 与空文件——它们在列表里只会被误选。
+ */
 function listJailbreaks() {
   let entries;
   try {
@@ -74,6 +92,8 @@ function listJailbreaks() {
   }
   return entries
     .filter((e) => e.isFile() && !e.name.startsWith('.'))
+    .filter((e) => !isReadmeName(e.name))
+    .filter((e) => !isEmptyFile(path.join(JAILBREAKS_DIR, e.name)))
     .map((e) => e.name)
     .sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))
     .map((f) => ({ id: 'jailbreaks/' + f, name: f.replace(/\.[^.]+$/, '') }));
