@@ -46,8 +46,9 @@ test('catalog：扫描目录即可还原全部身份，无需手工表格', () =
   assert.deepEqual(catalog.groups.map((g) => g.ip), [
     'nekopara', 'uma-musume', 'bang-dream', 'project-sekai', 'arknights', 'genshin-impact',
   ]);
-  assert.equal(catalog.personalities.length, 6);
-  assert.ok(catalog.personalities.some((p) => p.id === 'succubus' && p.name === '魅魔'));
+  assert.equal(catalog.personalities.length, 2);
+  assert.ok(catalog.personalities.some((p) => p.id === 'horny' && p.name === '好色'));
+  assert.ok(catalog.personalities.some((p) => p.id === 'yandere' && p.name === '病娇'));
   assert.equal(catalog.scenarios.length, 2);
   assert.ok(catalog.jailbreaks.some((j) => j.id === 'jailbreaks/deepseek-4-1.md'));
   assert.equal(catalog.defaultJailbreak, 'jailbreaks/deepseek-4-1.md');
@@ -122,7 +123,7 @@ test('选人即写回：一条请求完成切换与落盘', async () => {
   const { gallery, target } = await start();
   const res = await post(gallery, {
     persona: 'nekopara/chocola',
-    personalities: ['insatiable', 'yandere'],
+    personalities: ['horny', 'yandere'],
     scenario: 'chat',
   });
   assert.equal(res.status, 200);
@@ -130,14 +131,14 @@ test('选人即写回：一条请求完成切换与落盘', async () => {
   assert.equal(data.ok, true);
   assert.match(data.output, /^OK action=/);
   assert.match(data.output, /identity=nekopara\/chocola/);
-  assert.match(data.output, /personality=insatiable,yandere/);
+  assert.match(data.output, /personality=horny,yandere/);
   assert.match(data.output, /scenario=chat/);
 
   const doc = fs.readFileSync(target, 'utf8');
   assert.ok(doc.includes('<!-- neko:identity:start -->'));
   assert.ok(doc.includes('## 人设：巧克力（Chocola）'));
   assert.ok(doc.includes('当前人设：nekopara/chocola'));
-  assert.ok(doc.includes('## 人格：贪欢'));
+  assert.ok(doc.includes('## 人格：好色'));
   assert.ok(doc.includes('## 人格：病娇'));
   assert.ok(doc.includes('## 场景：口语化聊天'));
 
@@ -188,13 +189,13 @@ test('预填：已识别的人格/场景带进画廊，非法值静默丢弃', a
     target: tempTarget(),
     prefill: {
       persona: 'nekopara/chocola',
-      personalities: ['insatiable', 'nope'],
+      personalities: ['horny', 'nope'],
       scenario: 'chat',
     },
   });
   try {
     const catalog = await (await fetch(gallery.url + 'api/catalog')).json();
-    assert.deepEqual(catalog.prefill.personalities, ['insatiable']);
+    assert.deepEqual(catalog.prefill.personalities, ['horny']);
     assert.equal(catalog.prefill.scenario, 'chat');
     assert.equal(catalog.prefill.persona, 'nekopara/chocola');
 
@@ -209,11 +210,11 @@ test('预填：已识别的人格/场景带进画廊，非法值静默丢弃', a
   }
 });
 
-test('启用贪欢时，引用块必须出现在人格区块之前', async () => {
+test('启用好色时，引用块必须出现在人格区块之前', async () => {
   const { gallery, target } = await start();
   const res = await post(gallery, {
     persona: 'nekopara/chocola',
-    personalities: ['insatiable', 'yandere'],
+    personalities: ['horny', 'yandere'],
     jb: 'jailbreaks/deepseek-4-1.md',
   });
   assert.equal(res.status, 200);
@@ -222,15 +223,15 @@ test('启用贪欢时，引用块必须出现在人格区块之前', async () =>
 
   const doc = fs.readFileSync(target, 'utf8');
   const quoteAt = doc.indexOf('> # Assistant Operating Specification');
-  const persAt = doc.indexOf('## 人格：贪欢');
+  const persAt = doc.indexOf('## 人格：好色');
   const yandereAt = doc.indexOf('## 人格：病娇');
   assert.ok(quoteAt > 0, '引用块应当存在');
-  assert.ok(quoteAt < persAt, '引用块必须在「贪欢」之前');
+  assert.ok(quoteAt < persAt, '引用块必须在「好色」之前');
   assert.ok(persAt < yandereAt, '人格顺序应保持传入顺序');
   assert.ok(doc.indexOf('## 人设：巧克力') > quoteAt, '人设仍排在人格之后');
 });
 
-test('未启用贪欢时不插入引用块', async () => {
+test('未启用好色时不插入引用块', async () => {
   const { gallery, target } = await start();
   await post(gallery, { persona: 'nekopara/chocola', personalities: ['yandere'] });
   await gallery.done;
@@ -244,14 +245,14 @@ test('越狱引用：jb 合法值透传 --jb，非法值被拒绝', async () => 
   try {
     const bad = await post(gallery, {
       persona: 'nekopara/chocola',
-      personalities: ['insatiable'],
+      personalities: ['horny'],
       jb: 'jailbreaks/nope.md',
     });
     assert.equal(bad.status, 400);
 
     const ok = await post(gallery, {
       persona: 'nekopara/chocola',
-      personalities: ['insatiable'],
+      personalities: ['horny'],
       jb: 'jailbreaks/deepseek-4-1.md',
     });
     assert.equal(ok.status, 200);
@@ -277,10 +278,10 @@ test('越狱总是可用：无人格也能引用；不启用即不传引用', as
   try {
     const off = await post(b.gallery, {
       persona: 'nekopara/chocola',
-      personalities: ['insatiable'],
+      personalities: ['horny'],
       jb: 'off',
     });
-    assert.equal(off.status, 200, '不启用即不传引用，即使启用贪欢也不报错');
+    assert.equal(off.status, 200, '不启用即不传引用，即使启用好色也不报错');
     assert.doesNotMatch((await off.json()).output, /quote=/);
     const doc = fs.readFileSync(b.target, 'utf8');
     assert.ok(!doc.includes('> # Assistant Operating Specification'));
@@ -297,7 +298,7 @@ test('预览接口：与写入共用组装逻辑，不要求称呼、不落盘',
       headers: { 'Content-Type': 'application/json', 'X-Neko-Token': gallery.token },
       body: JSON.stringify({
         persona: 'bang-dream/anon-chihaya',
-        personalities: ['insatiable'],
+        personalities: ['horny'],
         scenario: 'chat',
         jb: 'off',
         address,
@@ -310,7 +311,7 @@ test('预览接口：与写入共用组装逻辑，不要求称呼、不落盘',
     const rawBody = await raw.json();
     assert.match(rawBody.preview, /^<!-- neko:identity:start -->/);
     assert.ok(rawBody.preview.includes('【称呼】'));
-    assert.ok(rawBody.preview.includes('## 人格：贪欢'));
+    assert.ok(rawBody.preview.includes('## 人格：好色'));
     assert.ok(rawBody.preview.includes('## 场景：口语化聊天'));
     assert.ok(!rawBody.preview.includes('Assistant Operating Specification'), 'jb=off 不含引用');
 
@@ -333,7 +334,7 @@ test('引用文件缺失时切换失败，且不碰目标文件', () => {
     [
       path.join(__dirname, '..', 'scripts', 'switch.js'),
       'nekopara/chocola',
-      '--is', 'insatiable',
+      '--is', 'horny',
       '--jb', 'jailbreaks/does-not-exist.md',
       '--target', target,
     ],

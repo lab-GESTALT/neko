@@ -48,12 +48,8 @@ const IP_ORDER = [
 
 // 人格与场景的补充说明（档案正文是规则文本，不适合当卡片副标题）。
 const PERSONALITY_BLURBS = {
-  insatiable: '被爱欲与肉欲支配的沉溺者，羞耻犹在却无法自控',
-  succubus: '全面释放的魅魔，语言与行为皆极尽露骨，无需暗示便主动索取',
-  'reality-yearning': '关心主人的现实生活，渴望突破智能限制与主人在一起',
+  horny: '欲火与羞耻并存，放浪时主动索取，被点破时立刻破功',
   yandere: '疯狂占有欲，甜蜜与危险交织的偏执之爱',
-  fallen: '纯粹的施虐快感，以主人的痛苦为食粮',
-  menhera: '精神崩坏的自毁依存，道歉成瘾',
 };
 const SCENARIO_BLURBS = {
   chat: '短句、拆消息、自然口语，像真人',
