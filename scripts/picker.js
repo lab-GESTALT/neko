@@ -3,15 +3,16 @@
  * neko 画廊 —— 本地 Web 选择器。零依赖（只用 Node 内置模块）。
  *
  * 用法:
- *   node picker.js [--port <n>] [--no-open] [--target <file>] [--timeout <sec>]
+ *   node picker.js [--port <n>] [--no-open] [--target <file>] [--timeout <sec>] [--preview-only]
  *
  * 行为:
  *   1. 扫描 personas/ personalities/ scenarios/ 生成清单（见 catalog.js）；
  *   2. 在 127.0.0.1 上起一个只读画廊，浏览器里按作品分组展示全部身份；
  *   3. 主人点选身份、勾选人格与场景后按下「确认切换」；
  *   4. 由本脚本调用 switch.js 写入目标区块，然后自行退出。
+ *      带 --preview-only（试运行）时确认只打印将写入的区块全文，不调用 switch.js。
  *
- * 输出: 成功时转发 switch.js 的 `OK ...` 行；失败输出 `ERROR ...`。
+ * 输出: 成功时转发 switch.js 的 `OK ...` 行（试运行为 `DRY-RUN ...` 与区块全文）；失败输出 `ERROR ...`。
  * 退出码: 0 已切换；1 运行错误；3 超时未选择。
  *
  * 安全: 仅监听回环地址；写接口要求页面注入的随机 token（防跨站表单提交）；
@@ -37,19 +38,22 @@ function parseArgs(argv) {
     open: true,
     target: null,
     timeoutSec: 900,
+    dryRun: false,
     prefill: { persona: null, personalities: [], scenario: null },
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
+    if (a === '--') continue; // 包管理器传入的分隔符
     if (a === '--port') opts.port = Number(argv[++i]);
     else if (a === '--no-open') opts.open = false;
+    else if (a === '--preview-only') opts.dryRun = true;
     else if (a === '--target') opts.target = argv[++i];
     else if (a === '--timeout') opts.timeoutSec = Number(argv[++i]);
     else if (a === '--prefill-persona') opts.prefill.persona = argv[++i];
     else if (a === '--prefill-personality') opts.prefill.personalities.push(argv[++i]);
     else if (a === '--prefill-scenario') opts.prefill.scenario = argv[++i];
     else if (a === '--help' || a === '-h') {
-      console.log('用法: node picker.js [--port <n>] [--no-open] [--target <file>] [--timeout <sec>]');
+      console.log('用法: node picker.js [--port <n>] [--no-open] [--target <file>] [--timeout <sec>] [--preview-only]');
       console.log('       [--prefill-persona <id>] [--prefill-personality <id> ...] [--prefill-scenario <id>]');
       process.exit(0);
     } else {
@@ -138,6 +142,7 @@ function createGallery(options = {}) {
     open: false,
     target: null,
     timeoutSec: 900,
+    dryRun: false,
     prefill: {},
     ...options,
   };
@@ -215,7 +220,37 @@ function createGallery(options = {}) {
     return { status: 200, body: { ok: true, persona: sel.persona, personalities: sel.personalities, scenario: sel.scenario, jb: sel.jb, address: sel.address } };
   }
 
+  /** 一行摘要：人设 / 人格 / 场景 / 引用 / 称呼，供终端与页面回显。 */
+  function describe(selection) {
+    const parts = [
+      'identity=' + selection.persona.id,
+      'personality=' + (selection.personalities.length ? selection.personalities.join('+') : 'none'),
+      'scenario=' + (selection.scenario || 'none'),
+      'jb=' + (selection.jb || 'none'),
+    ];
+    if (selection.address) parts.push('address=' + selection.address);
+    return parts.join(' ');
+  }
+
   function runSwitch(selection) {
+    // 试运行：只组装区块并打印，绝不调用 switch.js、绝不落盘
+    if (opts.dryRun) {
+      return Promise.resolve((() => {
+        try {
+          const block = buildBlock({
+            persona: selection.persona.id,
+            personalities: selection.personalities,
+            scenario: selection.scenario,
+            address: selection.address || null,
+            allowMissingAddress: true,
+            jb: selection.jb,
+          }).block;
+          return { code: 0, block, stdout: 'DRY-RUN ' + describe(selection), stderr: '' };
+        } catch (e) {
+          return { code: 1, stdout: '', stderr: String(e && e.message ? e.message : e) };
+        }
+      })());
+    }
     return new Promise((resolve) => {
       const args = [SWITCH_JS, selection.persona.id];
       if (selection.personalities.length > 0) {
@@ -330,6 +365,13 @@ function createGallery(options = {}) {
         }
         const line = result.stdout.trim();
         console.log(line);
+        if (opts.dryRun) {
+          // 试运行把完整区块打到终端，并在页面里保留一份，方便主人逐字核对
+          console.log(result.block);
+          sendJson(res, 200, { ok: true, dryRun: true, output: line, preview: result.block, persona: checked.body.persona.id });
+          finish({ ok: true, dryRun: true, output: line, preview: result.block, persona: checked.body.persona.id });
+          return;
+        }
         sendJson(res, 200, { ok: true, output: line, persona: checked.body.persona.id });
         finish({ ok: true, output: line, persona: checked.body.persona.id });
         return;
@@ -386,6 +428,7 @@ if (require.main === module) {
     port: opts.port,
     open: opts.open,
     target: opts.target,
+    dryRun: opts.dryRun,
     timeoutSec: opts.timeoutSec,
     prefill: opts.prefill,
   }).then((g) => {
